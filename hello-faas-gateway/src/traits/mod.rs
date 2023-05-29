@@ -15,6 +15,17 @@ impl<T> FunctionNotFound<T> for Option<T> {
     }
 }
 
+impl<T, E> FunctionNotFound<T> for Result<T, E> {
+    fn or_not_found(self) -> Result<T, (StatusCode, Json<Value>)> {
+        self.map_err(|_| {
+            (
+                StatusCode::NOT_FOUND,
+                Json(json!({ "error": "Function not found" })),
+            )
+        })
+    }
+}
+
 pub trait InternalServerError<T> {
     fn or_internal_error(self, message: &str) -> Result<T, (StatusCode, Json<Value>)>;
 }

@@ -21,15 +21,17 @@ pub async fn invoke(
     let path = path_and_query.path();
     let query = path_and_query.query();
 
-    let function_id = path.split('/').nth(1).or_not_found()?;
+    let function_id = path.split('/').nth(2).or_not_found()?;
     let paths = path
         .strip_prefix(&format!("/invoke/{}", function_id))
         .unwrap_or("/");
+    tracing::info!(?paths, ?query, ?function_id, "Invoke function");
 
     let function_container = state
         .container_repository
         .find_by_function_id(function_id)
         .await;
+    tracing::info!(?function_container, "Found function container");
 
     let container_id = function_container
         .first()
@@ -38,7 +40,7 @@ pub async fn invoke(
 
     if !function_container
         .first()
-        .map(|c| c.status == "running")
+        .map(|c| c.state == "running")
         .unwrap_or(false)
     {
         state
@@ -48,11 +50,28 @@ pub async fn invoke(
             .or_internal_error("Failed to start container")?;
     }
 
-    let mut builder = Request::builder().method(parts.method).uri(format!(
-        "http://localhost:8080{}?{}",
-        paths,
-        query.unwrap_or_default()
-    ));
+    let function = state
+        .function_repository
+        .find_by_id(function_id)
+        .await
+        .or_not_found()?;
+
+    let uri = match query {
+        Some(q) => format!(
+            "http://localhost:{}{}?{}",
+            function.exposed_port.unwrap_or(8080),
+            paths,
+            q
+        ),
+        None => format!(
+            "http://localhost:{}{}",
+            function.exposed_port.unwrap_or(8080),
+            paths
+        ),
+    };
+    tracing::info!(?uri, "Forwarding request");
+
+    let mut builder = Request::builder().method(parts.method).uri(uri);
 
     for (key, value) in parts.headers {
         if let Some(key) = key {

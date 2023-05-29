@@ -4,10 +4,11 @@ use hello_faas_gateway::{
     config::Config,
     handlers::{self, AppState},
     prelude::*,
-    repositories::{ContainerRepository, FunctionRepository},
+    repositories::{BinaryRepository, ContainerRepository, FunctionRepository},
 };
 
 use axum::{
+    extract::DefaultBodyLimit,
     routing::{any, get, post},
     Router, Server, ServiceExt,
 };
@@ -35,8 +36,6 @@ async fn main() -> Result<()> {
         .connect(&database_url)
         .await?;
 
-    sqlx::migrate!().run(&pool).await?;
-
     let function_repository = Arc::new(FunctionRepository::new(pool));
     tokio::spawn(idle_functions_cleanup_worker(function_repository.clone()));
 
@@ -47,7 +46,13 @@ async fn main() -> Result<()> {
         .await
         .context("Failed to pull base image")?;
 
-    let app = make_app(function_repository, container_repository, config);
+    let binary_repository = Arc::new(BinaryRepository::new());
+    let app = make_app(
+        function_repository,
+        container_repository,
+        binary_repository,
+        config,
+    );
     let app = ServiceBuilder::new()
         .layer(
             TraceLayer::new_for_http()
@@ -84,7 +89,7 @@ async fn idle_functions_cleanup_worker(function_repository: Arc<FunctionReposito
                 let opts = RmContainerOptions::builder().force(true).build();
                 if containers.get(container_id).remove(opts).await.is_ok() {
                     tracing::info!(?function, "Deleted idle function");
-                    function_repository.update(&function.id, None).await;
+                    function_repository.update(&function.id, None, None).await;
                 } else {
                     tracing::error!(?function, "Failed to delete idle function");
                 }
@@ -96,11 +101,13 @@ async fn idle_functions_cleanup_worker(function_repository: Arc<FunctionReposito
 fn make_app(
     function_repository: Arc<FunctionRepository>,
     container_repository: Arc<ContainerRepository>,
+    binary_repository: Arc<BinaryRepository>,
     config: Config,
 ) -> Router {
     let state = AppState::new(
         function_repository,
         container_repository,
+        binary_repository,
         config.runtime.base_image,
     );
 
@@ -109,4 +116,5 @@ fn make_app(
         .route("/deploy", post(handlers::deploy))
         .route("/invoke/*params", any(handlers::invoke))
         .with_state(state)
+        .layer(DefaultBodyLimit::disable())
 }

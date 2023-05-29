@@ -12,6 +12,7 @@ pub struct DeployedFunction {
     pub created_at: PrimitiveDateTime,
     pub updated_at: PrimitiveDateTime,
     pub invoked_at: PrimitiveDateTime,
+    pub exposed_port: Option<i32>,
     pub container_id: Option<String>,
 }
 
@@ -45,11 +46,17 @@ impl FunctionRepository {
     }
 
     /// Update the container_id of a function
-    pub async fn update(&self, id: &str, container_id: Option<&str>) -> Option<DeployedFunction> {
+    pub async fn update(
+        &self,
+        id: &str,
+        container_id: Option<&str>,
+        port: Option<i32>,
+    ) -> Option<DeployedFunction> {
         sqlx::query_as!(
             DeployedFunction,
-            "UPDATE functions SET container_id = $1 WHERE id = $2 RETURNING *",
+            "UPDATE functions SET container_id = $1, exposed_port = $2 WHERE id = $3 RETURNING *",
             container_id,
+            port,
             id
         )
         .fetch_one(&self.pool)

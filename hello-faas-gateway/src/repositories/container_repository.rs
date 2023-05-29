@@ -41,29 +41,32 @@ impl ContainerRepository {
 
     pub async fn find_by_function_id(&self, function_id: &str) -> Vec<Container> {
         let opts = ContainerListOptions::builder()
-            .filter(vec![
-                ContainerFilter::Label("hello-faas-version".into(), "v1".into()),
-                ContainerFilter::Label("function-id".into(), function_id.into()),
-            ])
+            .all()
+            .filter(vec![ContainerFilter::Label(
+                "function-id".into(),
+                function_id.into(),
+            )])
             .build();
 
-        self.docker
-            .containers()
-            .list(&opts)
-            .await
-            .ok()
-            .unwrap_or_default()
+        let result = self.docker.containers().list(&opts).await;
+
+        tracing::info!(?result, "Found containers");
+        result.ok().unwrap_or_default()
     }
 
     pub async fn create_container(
         &self,
         image: &str,
         function_id: &str,
+        function_port: u16,
+        binary_path: &str,
     ) -> Result<ContainerCreateInfo> {
         let container_name = format!("hello-faas-{}", function_id);
         let opts = ContainerOptions::builder(image)
             .name(&container_name)
             .cpus(0.5)
+            .expose(8080, "tcp", function_port.into())
+            .volumes(vec![&format!("{binary_path}:/bootstrap")])
             .labels(&HashMap::from([
                 ("hello-faas-version", "v1"),
                 ("function-id", function_id),
@@ -79,11 +82,17 @@ impl ContainerRepository {
     }
 
     pub async fn start_container(&self, container_id: &str) -> Result<()> {
-        self.docker
-            .containers()
-            .get(container_id)
+        let container = self.docker.containers().get(container_id);
+
+        container
             .start()
             .await
-            .with_context(|| format!("Failed to start container {}", container_id))
+            .with_context(|| format!("Failed to start container {}", container_id))?;
+
+        while !container.inspect().await?.state.running {
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        }
+
+        Ok(())
     }
 }
