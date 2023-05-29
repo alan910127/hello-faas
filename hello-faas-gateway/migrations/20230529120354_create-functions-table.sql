@@ -1,0 +1,8 @@
+-- Add migration script here
+CREATE TABLE IF NOT EXISTS functions (
+    id TEXT PRIMARY KEY,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    invoked_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    container_id TEXT
+);

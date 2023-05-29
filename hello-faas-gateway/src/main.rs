@@ -1,12 +1,14 @@
-use hello_faas_gateway::{config::Config, prelude::*};
+use hello_faas_gateway::{config::Config, prelude::*, repositories::FunctionRepository};
 
 use axum::{routing::get, Json, Router, Server, ServiceExt};
 use serde_json::{json, Value};
+use sqlx::postgres::PgPoolOptions;
 use tower::ServiceBuilder;
 use tower_http::trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer};
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    dotenv::dotenv().ok();
     tracing_subscriber::fmt()
         .with_target(false)
         .compact()
@@ -14,6 +16,17 @@ async fn main() -> Result<()> {
 
     let config = Config::load()?;
     tracing::info!(?config, "Loaded config");
+
+    let database_url = std::env::var("DATABASE_URL").context("DATABASE_URL not set")?;
+
+    let pool = PgPoolOptions::new()
+        .max_connections(5)
+        .connect(&database_url)
+        .await?;
+
+    sqlx::migrate!().run(&pool).await?;
+
+    let function_repository = FunctionRepository::new(pool);
 
     let app = Router::new().route("/", get(root));
 
