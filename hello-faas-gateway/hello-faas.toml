@@ -1,0 +1,2 @@
+[runtime]
+base-image = "debian:11.7-slim"
