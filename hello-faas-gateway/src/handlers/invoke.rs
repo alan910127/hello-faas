@@ -31,17 +31,10 @@ pub async fn invoke(
         .find_by_function_id(function_id)
         .await;
 
-    let container_id = match function_container.first() {
-        Some(container) => container.id.clone(),
-        None => {
-            state
-                .container_repository
-                .create_container(&state.base_image, function_id)
-                .await
-                .or_internal_error("Failed to create container")?
-                .id
-        }
-    };
+    let container_id = function_container
+        .first()
+        .map(|c| c.id.clone())
+        .or_not_found()?;
 
     if !function_container
         .first()

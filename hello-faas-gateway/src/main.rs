@@ -64,7 +64,7 @@ async fn main() -> Result<()> {
 }
 
 async fn idle_functions_cleanup_worker(function_repository: Arc<FunctionRepository>) -> Result<()> {
-    let mut interval = tokio::time::interval(std::time::Duration::from_secs(5));
+    let mut interval = tokio::time::interval(std::time::Duration::from_secs(15));
     let docker = Docker::new();
     let containers = docker.containers();
 

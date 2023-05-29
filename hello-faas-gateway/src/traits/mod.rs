@@ -33,3 +33,34 @@ where
         })
     }
 }
+
+impl<T> InternalServerError<T> for Option<T> {
+    fn or_internal_error(self, message: &str) -> Result<T, (StatusCode, Json<Value>)> {
+        self.ok_or_else(|| {
+            tracing::error!(message);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": "Internal server error" })),
+            )
+        })
+    }
+}
+
+pub trait BadRequest<T> {
+    fn or_bad_request(self, message: &str) -> Result<T, (StatusCode, Json<Value>)>;
+}
+
+impl<T, E> BadRequest<T> for Result<T, E>
+where
+    E: std::fmt::Debug,
+{
+    fn or_bad_request(self, message: &str) -> Result<T, (StatusCode, Json<Value>)> {
+        self.map_err(|e| {
+            tracing::error!(?e, message);
+            (
+                StatusCode::BAD_REQUEST,
+                Json(json!({ "error": "Bad request" })),
+            )
+        })
+    }
+}

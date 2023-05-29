@@ -5,22 +5,26 @@ use axum::{
 };
 use serde_json::{json, Value};
 
+use crate::traits::{BadRequest, InternalServerError};
+
 use super::AppState;
 
 /// Deploy a new function
 pub async fn deploy(
     State(state): State<AppState>,
-    mut binary: Multipart,
-) -> Result<Json<Value>, (StatusCode, String)> {
-    while let Some(field) = binary
+    mut multipart: Multipart,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    tracing::info!(?multipart, "Received multipart");
+
+    while let Some(field) = multipart
         .next_field()
         .await
-        .map_err(|err| (StatusCode::BAD_REQUEST, err.to_string()))?
+        .or_bad_request("Failed to parse multipart")?
     {
         let bytes = field
             .bytes()
             .await
-            .map_err(|err| (StatusCode::BAD_REQUEST, err.to_string()))?;
+            .or_bad_request("Failed to parse multipart")?;
 
         tracing::info!(?bytes, "Received binary");
     }
@@ -30,12 +34,13 @@ pub async fn deploy(
         .function_repository
         .create(&uuid)
         .await
-        .ok_or_else(|| {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "Failed to create function".to_string(),
-            )
-        })?;
+        .or_internal_error("Failed to deploy new function")?;
+
+    state
+        .container_repository
+        .create_container(&state.base_image, &function.id)
+        .await
+        .or_internal_error("Failed to create container")?;
 
     Ok(Json(
         json!({ "message": "Function deployed!", "id": function.id }),
