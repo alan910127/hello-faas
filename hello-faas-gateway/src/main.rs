@@ -1,9 +1,17 @@
 use std::sync::Arc;
 
-use hello_faas_gateway::{config::Config, prelude::*, repositories::FunctionRepository};
+use hello_faas_gateway::{
+    config::Config,
+    handlers::{self, AppState},
+    prelude::*,
+    repositories::FunctionRepository,
+};
 
-use axum::{routing::get, Json, Router, Server, ServiceExt};
-use serde_json::{json, Value};
+use axum::{
+    routing::{any, get, post},
+    Router, Server, ServiceExt,
+};
+
 use shiplift::{Docker, RmContainerOptions};
 use sqlx::postgres::PgPoolOptions;
 use tower::ServiceBuilder;
@@ -32,8 +40,7 @@ async fn main() -> Result<()> {
     let function_repository = Arc::new(FunctionRepository::new(pool));
     tokio::spawn(idle_functions_cleanup_worker(function_repository.clone()));
 
-    let app = Router::new().route("/", get(root));
-
+    let app = make_app(function_repository);
     let app = ServiceBuilder::new()
         .layer(
             TraceLayer::new_for_http()
@@ -47,10 +54,6 @@ async fn main() -> Result<()> {
         .serve(app.into_make_service())
         .await
         .with_context(|| "Failed to start server")
-}
-
-async fn root() -> Json<Value> {
-    Json(json!({ "message": "Server is running!" }))
 }
 
 async fn idle_functions_cleanup_worker(function_repository: Arc<FunctionRepository>) -> Result<()> {
@@ -81,4 +84,14 @@ async fn idle_functions_cleanup_worker(function_repository: Arc<FunctionReposito
             }
         }
     }
+}
+
+fn make_app(function_repository: Arc<FunctionRepository>) -> Router {
+    let state = AppState::new(function_repository);
+
+    Router::new()
+        .route("/", get(handlers::root))
+        .route("/deploy", post(handlers::deploy))
+        .with_state(state)
+        .route("/invoke/*params", any(handlers::invoke))
 }

@@ -1,6 +1,7 @@
 use crate::prelude::*;
 use sqlx::{types::time::PrimitiveDateTime, PgPool};
 
+#[derive(Debug)]
 pub struct FunctionRepository {
     pool: PgPool,
 }

@@ -1,4 +1,5 @@
 pub mod config;
+pub mod handlers;
 pub mod prelude;
 pub mod repositories;
 
