@@ -5,6 +5,7 @@ pub struct FunctionRepository {
     pool: PgPool,
 }
 
+#[derive(Debug, sqlx::FromRow)]
 pub struct DeployedFunction {
     pub id: String,
     pub created_at: PrimitiveDateTime,

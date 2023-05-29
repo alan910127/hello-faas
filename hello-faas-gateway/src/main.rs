@@ -4,7 +4,7 @@ use hello_faas_gateway::{config::Config, prelude::*, repositories::FunctionRepos
 
 use axum::{routing::get, Json, Router, Server, ServiceExt};
 use serde_json::{json, Value};
-use shiplift::Docker;
+use shiplift::{Docker, RmContainerOptions};
 use sqlx::postgres::PgPoolOptions;
 use tower::ServiceBuilder;
 use tower_http::trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer};
@@ -70,8 +70,14 @@ async fn idle_functions_cleanup_worker(function_repository: Arc<FunctionReposito
         };
 
         for function in functions {
-            if let Some(container_id) = function.container_id {
-                containers.get(&container_id).delete().await.ok();
+            if let Some(container_id) = &function.container_id {
+                let opts = RmContainerOptions::builder().force(true).build();
+                if containers.get(container_id).remove(opts).await.is_ok() {
+                    tracing::info!(?function, "Deleted idle function");
+                    function_repository.update(&function.id, None).await;
+                } else {
+                    tracing::error!(?function, "Failed to delete idle function");
+                }
             }
         }
     }
