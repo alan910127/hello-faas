@@ -1,0 +1,12 @@
+version: '3'
+
+services:
+  postgresql:
+    container_name: hello-faas-db
+    image: postgres:15.3-alpine3.18
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: hello-faas
+    ports:
+      - 5432:5432
