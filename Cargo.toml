@@ -1,7 +1,7 @@
 [workspace]
 members = [
     "lambda-http-example",
-    "hello-faas-cli",
+    "hello-faas-deploy",
     "hello-faas-gateway",
     "hello-faas",
 ]

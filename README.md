@@ -5,7 +5,7 @@
 ```
 hello-faas
 └── The library helping to deploy functions on hello-faas
-hello-faas-cli
+hello-faas-deploy
 └── Command line tool for communicating with the gateway
 hello-faas-gateway
 └── The gateway of handling deploy request, function invokation, and container orchestration
