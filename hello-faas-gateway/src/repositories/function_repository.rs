@@ -1,3 +1,4 @@
+use crate::prelude::*;
 use sqlx::{types::time::PrimitiveDateTime, PgPool};
 
 pub struct FunctionRepository {
@@ -17,6 +18,7 @@ impl FunctionRepository {
         Self { pool }
     }
 
+    /// Find a function by id
     pub async fn find_by_id(&self, id: &str) -> Option<DeployedFunction> {
         sqlx::query_as!(
             DeployedFunction,
@@ -28,6 +30,7 @@ impl FunctionRepository {
         .ok()
     }
 
+    /// Create a new function
     pub async fn create(&self, id: &str) -> Option<DeployedFunction> {
         sqlx::query_as!(
             DeployedFunction,
@@ -39,6 +42,7 @@ impl FunctionRepository {
         .ok()
     }
 
+    /// Update the container_id of a function
     pub async fn update(&self, id: &str, container_id: Option<&str>) -> Option<DeployedFunction> {
         sqlx::query_as!(
             DeployedFunction,
@@ -51,6 +55,7 @@ impl FunctionRepository {
         .ok()
     }
 
+    /// Set the invoked_at timestamp to NOW()
     pub async fn set_invoked(&self, id: &str) -> Option<DeployedFunction> {
         sqlx::query_as!(
             DeployedFunction,
@@ -60,5 +65,17 @@ impl FunctionRepository {
         .fetch_one(&self.pool)
         .await
         .ok()
+    }
+
+    /// Find all functions that are idle for more than 5 minutes
+    pub async fn find_idle(&self) -> Result<Vec<DeployedFunction>> {
+        let functions = sqlx::query_as!(
+            DeployedFunction,
+            "SELECT * FROM functions WHERE container_id IS NOT NULL AND invoked_at < NOW() - INTERVAL '5 minutes'"
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(functions)
     }
 }

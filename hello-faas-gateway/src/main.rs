@@ -1,7 +1,10 @@
+use std::sync::Arc;
+
 use hello_faas_gateway::{config::Config, prelude::*, repositories::FunctionRepository};
 
 use axum::{routing::get, Json, Router, Server, ServiceExt};
 use serde_json::{json, Value};
+use shiplift::Docker;
 use sqlx::postgres::PgPoolOptions;
 use tower::ServiceBuilder;
 use tower_http::trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer};
@@ -26,7 +29,8 @@ async fn main() -> Result<()> {
 
     sqlx::migrate!().run(&pool).await?;
 
-    let function_repository = FunctionRepository::new(pool);
+    let function_repository = Arc::new(FunctionRepository::new(pool));
+    tokio::spawn(idle_functions_cleanup_worker(function_repository.clone()));
 
     let app = Router::new().route("/", get(root));
 
@@ -47,4 +51,28 @@ async fn main() -> Result<()> {
 
 async fn root() -> Json<Value> {
     Json(json!({ "message": "Server is running!" }))
+}
+
+async fn idle_functions_cleanup_worker(function_repository: Arc<FunctionRepository>) -> Result<()> {
+    let mut interval = tokio::time::interval(std::time::Duration::from_secs(5));
+    let docker = Docker::new();
+    let containers = docker.containers();
+
+    loop {
+        interval.tick().await;
+
+        let functions = match function_repository.find_idle().await {
+            Ok(functions) => functions,
+            Err(e) => {
+                tracing::error!(?e, "Failed to find idle functions");
+                continue;
+            }
+        };
+
+        for function in functions {
+            if let Some(container_id) = function.container_id {
+                containers.get(&container_id).delete().await.ok();
+            }
+        }
+    }
 }
