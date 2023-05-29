@@ -5,4 +5,5 @@ members = [
     "hello-faas-gateway",
     "hello-faas",
     "demo-function",
+    "migrate",
 ]
