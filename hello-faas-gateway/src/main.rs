@@ -4,7 +4,7 @@ use hello_faas_gateway::{
     config::Config,
     handlers::{self, AppState},
     prelude::*,
-    repositories::FunctionRepository,
+    repositories::{ContainerRepository, FunctionRepository},
 };
 
 use axum::{
@@ -40,7 +40,14 @@ async fn main() -> Result<()> {
     let function_repository = Arc::new(FunctionRepository::new(pool));
     tokio::spawn(idle_functions_cleanup_worker(function_repository.clone()));
 
-    let app = make_app(function_repository);
+    let docker = Docker::new();
+    let container_repository = Arc::new(ContainerRepository::new(docker));
+    container_repository
+        .pull_image(&config.runtime.base_image)
+        .await
+        .context("Failed to pull base image")?;
+
+    let app = make_app(function_repository, container_repository, config);
     let app = ServiceBuilder::new()
         .layer(
             TraceLayer::new_for_http()
@@ -86,12 +93,20 @@ async fn idle_functions_cleanup_worker(function_repository: Arc<FunctionReposito
     }
 }
 
-fn make_app(function_repository: Arc<FunctionRepository>) -> Router {
-    let state = AppState::new(function_repository);
+fn make_app(
+    function_repository: Arc<FunctionRepository>,
+    container_repository: Arc<ContainerRepository>,
+    config: Config,
+) -> Router {
+    let state = AppState::new(
+        function_repository,
+        container_repository,
+        config.runtime.base_image,
+    );
 
     Router::new()
         .route("/", get(handlers::root))
         .route("/deploy", post(handlers::deploy))
-        .with_state(state)
         .route("/invoke/*params", any(handlers::invoke))
+        .with_state(state)
 }

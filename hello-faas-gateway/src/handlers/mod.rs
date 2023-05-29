@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::repositories::FunctionRepository;
+use crate::repositories::{ContainerRepository, FunctionRepository};
 use axum::Json;
 use serde_json::{json, Value};
 
@@ -10,15 +10,23 @@ pub mod invoke;
 pub use deploy::deploy;
 pub use invoke::invoke;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct AppState {
     function_repository: Arc<FunctionRepository>,
+    container_repository: Arc<ContainerRepository>,
+    base_image: String,
 }
 
 impl AppState {
-    pub fn new(function_repository: Arc<FunctionRepository>) -> Self {
+    pub fn new(
+        function_repository: Arc<FunctionRepository>,
+        container_repository: Arc<ContainerRepository>,
+        base_image: String,
+    ) -> Self {
         Self {
             function_repository,
+            container_repository,
+            base_image,
         }
     }
 }

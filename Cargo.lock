@@ -675,6 +675,7 @@ dependencies = [
  "axum",
  "color-eyre",
  "dotenv",
+ "futures",
  "hyper",
  "serde",
  "serde_json",
