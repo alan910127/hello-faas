@@ -29,6 +29,10 @@ Function-as-a-service, also know as FaaS, is one important part of serverless ar
   GET,POST,,... /invoke/{function_id}
   ```
 
+## Architecture
+
+![Architecture](./docs/architecture.png)
+
 ## About
 
 ```
