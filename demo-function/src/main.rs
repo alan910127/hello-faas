@@ -1,7 +1,7 @@
 use axum::{
     extract::Path,
     routing::{get, post},
-    Json, Router,
+    Json, Router, http::StatusCode,
 };
 use hello_faas::Error;
 use serde_json::{json, Value};
@@ -31,8 +31,14 @@ async fn post_foo() -> Json<Value> {
     Json(json!({ "message": "I am POST /foo" }))
 }
 
-async fn post_foo_name(Path(name): Path<String>) -> Json<Value> {
-    Json(json!({
+async fn post_foo_name(Path(name): Path<String>) -> (StatusCode, Json<Value>) {
+    if !name.eq_ignore_ascii_case("nscap") {
+        return (StatusCode::UNAUTHORIZED, Json(json!({
+            "message": "NO! You are not nscap!"
+        })))
+    }
+
+    (StatusCode::OK, Json(json!({
         "message": format!("I am POST /foo/:name, name={name}")
-    }))
+    })))
 }
